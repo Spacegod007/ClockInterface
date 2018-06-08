@@ -2,8 +2,8 @@ package clockapp.serialcommunication;
 
 public enum CommandByte
 {
-    DATE_CHANGED(12),
-    TIME_CHANGED(13);
+    TIME_CHANGED(12),
+    DATE_CHANGED(13);
 
     private final int value;
 

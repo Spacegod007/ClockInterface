@@ -42,6 +42,7 @@ public class SerialCommunicator implements SerialPortEventListener
 
     public SerialCommunicator(ICommunicationManager manager)
     {
+        LOGGER.log(Level.INFO, "Initialising serial communication");
         this.manager = manager;
 
         try
@@ -49,10 +50,14 @@ public class SerialCommunicator implements SerialPortEventListener
             openCommunication(getSerialPort());
             initialiseStreams();
             initialiseListener();
+
+            LOGGER.log(Level.INFO, "Done initialising serial communication");
         }
         catch (MissingSerialPortException e)
         {
             LOGGER.log(Level.SEVERE, "Missing serial port to communicate with", e);
+            LOGGER.log(Level.SEVERE, "Failed to initialise serial communication");
+            System.exit(-1);
         }
     }
 
@@ -181,10 +186,12 @@ public class SerialCommunicator implements SerialPortEventListener
 
     private Message translateData(List<Integer> data)
     {
-        if (!(data.get(0) == START_MESSAGE_BYTE_1 && data.get(1) == START_MESSAGE_BYTE_2 && data.get(data.size()) == END_MESSAGE))
+        if (!(data.get(0) == START_MESSAGE_BYTE_1 && data.get(1) == START_MESSAGE_BYTE_2 && data.get(data.size() - 1) == END_MESSAGE))
         {
             throw new IllegalArgumentException("incomplete message received");
         }
+
+        trimExcessData(data);
 
         CommandByte commandByte = CommandByte.valueOf(data.get(0));
 
@@ -197,5 +204,12 @@ public class SerialCommunicator implements SerialPortEventListener
             default:
                 throw new NotImplementedException();
         }
+    }
+
+    private void trimExcessData(List<Integer> data)
+    {
+        data.remove(0);
+        data.remove(0);
+        data.remove(data.size() - 1);
     }
 }
