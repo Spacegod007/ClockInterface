@@ -1,12 +1,17 @@
 package clockapp.serialcommunication;
 
+import clockapp.logic.messages.ICommunicationManager;
+import clockapp.logic.models.Message;
 import gnu.io.*;
 import org.springframework.stereotype.Component;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.TooManyListenersException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -18,13 +23,15 @@ import java.util.logging.Logger;
 @Component
 public class SerialCommunicator implements SerialPortEventListener
 {
-    public static void main(String[] args)
-    {
-        new SerialCommunicator();
-    }
     private static final Logger LOGGER = Logger.getLogger(SerialCommunicator.class.getName());
 
     private static final int TIMEOUT = 2000;
+
+    private static final int START_MESSAGE_BYTE_1 = 240;
+    private static final int START_MESSAGE_BYTE_2 = 15;
+    private static final int END_MESSAGE = 90;
+
+    private final ICommunicationManager manager;
 
     private SerialPort serialPort;
     private InputStream inputStream;
@@ -33,8 +40,10 @@ public class SerialCommunicator implements SerialPortEventListener
 
     private boolean isConnected = false;
 
-    public SerialCommunicator()
+    public SerialCommunicator(ICommunicationManager manager)
     {
+        this.manager = manager;
+
         try
         {
             openCommunication(getSerialPort());
@@ -139,19 +148,54 @@ public class SerialCommunicator implements SerialPortEventListener
         {
             try
             {
-                int value = inputStream.read();
-                while (value != -1)
-                {
-                    System.out.println(value);
-                    value = inputStream.read();
-                }
-
-                //todo do something with incoming data
+                manager.addMessage(translateData(getData(inputStream)));
             }
             catch (IOException e)
             {
-                LOGGER.log(Level.SEVERE, "Something went wrong while reading incoming data");
+                LOGGER.log(Level.SEVERE, "Something went wrong while reading incoming data", e);
             }
+            catch (Exception e)
+            {
+                LOGGER.log(Level.SEVERE, "Something went wrong while interpreting the message", e);
+            }
+        }
+    }
+
+    private List<Integer> getData(InputStream inputStream) throws IOException
+    {
+        List<Integer> messageContents = new ArrayList<>();
+
+        int currentValue = inputStream.read();
+        while (currentValue != -1)
+        {
+            messageContents.add(currentValue);
+            if (currentValue == END_MESSAGE)
+            {
+                break;
+            }
+            currentValue = inputStream.read();
+        }
+
+        return messageContents;
+    }
+
+    private Message translateData(List<Integer> data)
+    {
+        if (!(data.get(0) == START_MESSAGE_BYTE_1 && data.get(1) == START_MESSAGE_BYTE_2 && data.get(data.size()) == END_MESSAGE))
+        {
+            throw new IllegalArgumentException("incomplete message received");
+        }
+
+        CommandByte commandByte = CommandByte.valueOf(data.get(0));
+
+        switch (commandByte)
+        {
+            case DATE_CHANGED:
+                return new Message(data.get(1), data.get(2), data.get(3));
+            case TIME_CHANGED:
+                return new Message(data.get(1), data.get(2));
+            default:
+                throw new NotImplementedException();
         }
     }
 }

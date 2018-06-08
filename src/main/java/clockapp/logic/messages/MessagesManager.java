@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 import java.util.PriorityQueue;
 import java.util.Queue;
 
+//todo add observer pattern functionality over web
+
 @Component
 public class MessagesManager implements ICommunicationManager, IRetrievableMessageManager
 {
@@ -24,6 +26,7 @@ public class MessagesManager implements ICommunicationManager, IRetrievableMessa
         synchronized (sync)
         {
             messages.add(message);
+            //todo inform subscribers
         }
     }
 
