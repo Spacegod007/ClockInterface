@@ -1,10 +1,8 @@
 package clockapp.logic.messages;
 
-import clockapp.logic.models.Message;
+import clockapp.logic.models.ClockDateTimeValue;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -15,40 +13,40 @@ public class MessagesManager implements ICommunicationManager, IRetrievableMessa
 {
     private static final Logger LOGGER = Logger.getLogger(MessagesManager.class.getName());
 
-    private final BlockingQueue<Message> messages;
+    private ClockDateTimeValue latestValue;
     private final Object sync;
 
     public MessagesManager()
     {
         sync = new Object();
-        messages = new ArrayBlockingQueue<>(16);
+        latestValue = null;
     }
 
     @Override
-    public void addMessage(Message message)
+    public void setLatestValue(ClockDateTimeValue clockDateTimeValue)
     {
+        if (clockDateTimeValue == null)
+        {
+            return;
+        }
+
+        LOGGER.log(Level.INFO, "Setting new clock value to: " + clockDateTimeValue);
+
         synchronized (sync)
         {
-            try
-            {
-                messages.put(message);
-                System.out.println(message);
-            }
-            catch (InterruptedException e)
-            {
-                LOGGER.log(Level.SEVERE, "Interrupted while waiting to put message", e);
-            }
+            latestValue = clockDateTimeValue;
+            System.out.println(clockDateTimeValue);
 
             //todo inform subscribers
         }
     }
 
     @Override
-    public Message getLatestMessage()
+    public ClockDateTimeValue getLatestMessage()
     {
         synchronized (sync)
         {
-            return messages.poll();
+            return latestValue;
         }
     }
 }

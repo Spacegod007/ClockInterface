@@ -1,4 +1,4 @@
-package clockapp.serialcommunication;
+package clockapp.serialcommunication.communication;
 
 public enum CommandByte
 {
@@ -10,11 +10,6 @@ public enum CommandByte
     CommandByte(int value)
     {
         this.value = value;
-    }
-
-    public int getValue()
-    {
-        return value;
     }
 
     public static CommandByte valueOf(int value)

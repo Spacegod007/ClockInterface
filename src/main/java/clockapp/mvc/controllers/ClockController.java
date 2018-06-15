@@ -1,7 +1,7 @@
 package clockapp.mvc.controllers;
 
 import clockapp.logic.messages.IRetrievableMessageManager;
-import clockapp.logic.models.Message;
+import clockapp.logic.models.ClockDateTimeValue;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,7 +17,7 @@ public class ClockController
     }
 
     @RequestMapping(value = "/getLatestMessage", method = RequestMethod.POST)
-    public Message getLatestMessage()
+    public ClockDateTimeValue getLatestMessage()
     {
         return manager.getLatestMessage();
     }

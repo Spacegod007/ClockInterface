@@ -1,8 +1,8 @@
 package clockapp.logic.messages;
 
-import clockapp.logic.models.Message;
+import clockapp.logic.models.ClockDateTimeValue;
 
 public interface IRetrievableMessageManager
 {
-    Message getLatestMessage();
+    ClockDateTimeValue getLatestMessage();
 }

@@ -1,9 +1,9 @@
 package clockapp.logic.messages;
 
 
-import clockapp.logic.models.Message;
+import clockapp.logic.models.ClockDateTimeValue;
 
 public interface ICommunicationManager
 {
-    void addMessage(Message message);
+    void setLatestValue(ClockDateTimeValue clockDateTimeValue);
 }

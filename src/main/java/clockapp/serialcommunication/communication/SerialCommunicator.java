@@ -1,10 +1,10 @@
-package clockapp.serialcommunication;
+package clockapp.serialcommunication.communication;
 
 import clockapp.logic.messages.ICommunicationManager;
-import clockapp.logic.models.Message;
+import clockapp.logic.models.ClockDateTimeValue;
+import clockapp.serialcommunication.MissingSerialPortException;
 import gnu.io.*;
 import org.springframework.stereotype.Component;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,12 +37,12 @@ public class SerialCommunicator implements SerialPortEventListener
     private InputStream inputStream;
     private OutputStream outputStream;
 
-
-    private boolean isConnected = false;
+    private int receivedMinute = 0;
+    private int receivedHour = 0;
 
     public SerialCommunicator(ICommunicationManager manager)
     {
-        LOGGER.log(Level.INFO, "Initialising serial communication");
+        LOGGER.log(Level.INFO, "Initialising communication communication");
         this.manager = manager;
 
         try
@@ -51,16 +51,21 @@ public class SerialCommunicator implements SerialPortEventListener
             initialiseStreams();
             initialiseListener();
 
-            LOGGER.log(Level.INFO, "Done initialising serial communication");
+            LOGGER.log(Level.INFO, "Done initialising communication communication");
         }
         catch (MissingSerialPortException e)
         {
-            LOGGER.log(Level.SEVERE, "Missing serial port to communicate with", e);
-            LOGGER.log(Level.SEVERE, "Failed to initialise serial communication");
+            LOGGER.log(Level.SEVERE, "Missing communication port to communicate with", e);
+            LOGGER.log(Level.SEVERE, "Failed to initialise communication communication");
             System.exit(-1);
         }
     }
 
+    /**
+     * Obtains the local serial port and tries to connect to it
+     * @return The port identifier
+     * @throws MissingSerialPortException if the port could not be found
+     */
     private CommPortIdentifier getSerialPort() throws MissingSerialPortException
     {
         Enumeration portIdentifiers = CommPortIdentifier.getPortIdentifiers();
@@ -75,15 +80,19 @@ public class SerialCommunicator implements SerialPortEventListener
             }
         }
 
-        throw new MissingSerialPortException("Missing port for serial communication");
+        throw new MissingSerialPortException("Missing port for communication communication");
     }
 
+    /**
+     * Opens communication with the connected device
+     * (in this case the clock)
+     * @param commPortIdentifier The identifier of the port to connect through
+     */
     private void openCommunication(CommPortIdentifier commPortIdentifier)
     {
         try
         {
             serialPort = (SerialPort) commPortIdentifier.open("clock", TIMEOUT);
-            isConnected = true;
         }
         catch (PortInUseException e)
         {
@@ -95,21 +104,25 @@ public class SerialCommunicator implements SerialPortEventListener
         }
     }
 
-    private boolean initialiseStreams()
+    /**
+     * Initialises the data streams so they can be read when data is being transported
+     */
+    private void initialiseStreams()
     {
         try
         {
             inputStream = serialPort.getInputStream();
             outputStream = serialPort.getOutputStream();
-            return true;
         }
         catch (IOException e)
         {
-            LOGGER.log(Level.SEVERE, "Something went wrong setting up one of the serial communication streams", e);
-            return false;
+            LOGGER.log(Level.SEVERE, "Something went wrong setting up one of the communication communication streams", e);
         }
     }
 
+    /**
+     * Initialises the event listener which gets triggered when an incoming dataStream is detected
+     */
     private void initialiseListener()
     {
         try
@@ -123,6 +136,9 @@ public class SerialCommunicator implements SerialPortEventListener
         }
     }
 
+    /**
+     * Disconnects the system of the commPort
+     */
     private void disconnect()
     {
         try
@@ -133,19 +149,33 @@ public class SerialCommunicator implements SerialPortEventListener
             outputStream.close();
             inputStream.close();
 
-            isConnected = false;
         }
         catch (IOException e)
         {
-            LOGGER.log(Level.SEVERE, "Something went wrong while disconnecting from the serial communication");
+            LOGGER.log(Level.SEVERE, "Something went wrong while disconnecting from the communication communication");
         }
     }
 
-    public void writeData() //todo add parameters for sending data
+    /**
+     * Writes data over the commPort
+     */
+    public void writeData(byte[] send)
     {
-
+        try
+        {
+            outputStream.write(send);
+            outputStream.flush();
+        }
+        catch (IOException e)
+        {
+            LOGGER.log(Level.SEVERE, "Something went wrong while writing serial data", e);
+        }
     }
 
+    /**
+     * An event which gets triggered when an incoming message is detected
+     * @param serialPortEvent the event which contains all information needed to obtain the data
+     */
     @Override
     public void serialEvent(SerialPortEvent serialPortEvent)
     {
@@ -153,7 +183,7 @@ public class SerialCommunicator implements SerialPortEventListener
         {
             try
             {
-                manager.addMessage(translateData(getData(inputStream)));
+                manager.setLatestValue(translateData(getData(inputStream)));
             }
             catch (IOException e)
             {
@@ -166,6 +196,12 @@ public class SerialCommunicator implements SerialPortEventListener
         }
     }
 
+    /**
+     * Gets the data from an incoming dataStream
+     * @param inputStream the incoming dataStream
+     * @return a list of integers which symbolise the bytes that were read from the stream
+     * @throws IOException if something goes wrong while reading the dataStream
+     */
     private List<Integer> getData(InputStream inputStream) throws IOException
     {
         List<Integer> messageContents = new ArrayList<>();
@@ -184,7 +220,12 @@ public class SerialCommunicator implements SerialPortEventListener
         return messageContents;
     }
 
-    private Message translateData(List<Integer> data)
+    /**
+     * Translates the data to an object
+     * @param data a list of numbers representing the raw data
+     * @return An Object containing the date and time or null depending if the date or time got send
+     */
+    private ClockDateTimeValue translateData(List<Integer> data)
     {
         if (!(data.get(0) == START_MESSAGE_BYTE_1 && data.get(1) == START_MESSAGE_BYTE_2 && data.get(data.size() - 1) == END_MESSAGE))
         {
@@ -193,17 +234,24 @@ public class SerialCommunicator implements SerialPortEventListener
 
         trimExcessData(data);
 
-        CommandByte commandByte = CommandByte.valueOf(data.get(0));
-
-        switch (commandByte)
+        try
         {
-            case DATE_CHANGED:
-                return new Message(data.get(1), data.get(2), data.get(3));
-            case TIME_CHANGED:
-                return new Message(data.get(1), data.get(2));
-            default:
-                throw new NotImplementedException();
+            switch (CommandByte.valueOf(data.get(0)))
+            {
+                case DATE_CHANGED:
+                    return new ClockDateTimeValue(receivedMinute, receivedHour, data.get(2), data.get(3), data.get(4));
+                case TIME_CHANGED:
+                    receivedMinute = data.get(2);
+                    receivedHour = data.get(3);
+                    break;
+            }
         }
+        catch (IllegalArgumentException e)
+        {
+            LOGGER.log(Level.WARNING, "Received message of clock with invalid commandByte", e);
+        }
+
+        return null;
     }
 
     private void trimExcessData(List<Integer> data)
